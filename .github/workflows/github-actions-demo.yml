@@ -15,14 +15,21 @@ on:
 jobs:
   Build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - run: |
-          echo "🎉 The job was triggered by event: ${{ github.event_name }}"
-          echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ."
-        
+          echo "🎉 The job was triggered by event: $EVENT_NAME"
+          echo "🔎 The name of your branch is $REF and your repository is ."
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+
       - uses: actions/checkout@v3.0.2
 
       - name: List files in the repository
         run: |
-          echo "The repository ${{ github.repository }} contains the following files:"
+          echo "The repository $REPOSITORY contains the following files:"
           tree
+        env:
+          REPOSITORY: ${{ github.repository }}

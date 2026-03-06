@@ -34,26 +34,36 @@ function shuffle(array) {
     return array;
 }
 module.exports = async (args) => {
-    const { github, context } = args;
+    const { github, context, core } = args;
     const trainer = context.payload.sender?.login;
     var issue = context.issue;
     if (!issue.number) {
-        issue.number = context.payload['inputs'].issue_number;
+        const rawIssueNumber = context.payload['inputs']?.issue_number;
+        const parsedNumber = parseInt(rawIssueNumber, 10);
+        if (!rawIssueNumber || isNaN(parsedNumber) || parsedNumber <= 0) {
+            core.setFailed(`Invalid issue_number: "${rawIssueNumber}". Must be a positive integer.`);
+            return;
+        }
+        issue.number = parsedNumber;
     }
-    const commentUsers = await github.paginate(github.rest.issues.listComments, {
-        owner: issue.owner,
-        repo: issue.repo,
-        issue_number: issue.number,
-    }, (response) => response.data.map((issue) => issue.user?.login));
-    const groupSize = 2; // we use pairs for now
-    const userGroups = putUsersInShuffledGroups(commentUsers, trainer, groupSize);
-    for (const userGroup of userGroups) {
-        const usersAsListMarkdown = Array.from(userGroup).map(user => `- @${user}`).join('\n');
-        await github.rest.issues.createComment({
-            issue_number: issue.number,
+    try {
+        const commentUsers = await github.paginate(github.rest.issues.listComments, {
             owner: issue.owner,
             repo: issue.repo,
-            body: `These people will work together:\n${usersAsListMarkdown}`,
-        });
+            issue_number: issue.number,
+        }, (response) => response.data.map((issue) => issue.user?.login));
+        const groupSize = 2; // we use pairs for now
+        const userGroups = putUsersInShuffledGroups(commentUsers, trainer, groupSize);
+        for (const userGroup of userGroups) {
+            const usersAsListMarkdown = Array.from(userGroup).map(user => `- @${user}`).join('\n');
+            await github.rest.issues.createComment({
+                issue_number: issue.number,
+                owner: issue.owner,
+                repo: issue.repo,
+                body: `These people will work together:\n${usersAsListMarkdown}`,
+            });
+        }
+    } catch (error) {
+        core.setFailed(`Failed to create pairs: ${error.message}`);
     }
 };
